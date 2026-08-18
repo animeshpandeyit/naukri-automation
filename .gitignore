@@ -43,3 +43,14 @@ videos/
 *.png
 *.jpg
 *.jpeg
+
+
+# Gmail OAuth credentials
+credentials/
+token.json
+
+# Job finder logs
+logs/
+
+# Local browser/session data
+browser-profile/
