@@ -1,15 +1,515 @@
 [
   {
-    "title": "Gen AI Automation",
-    "company": "Apeksha",
-    "recruiter": "Apeksha",
-    "location": "Bengaluru,Kolkata,Delhi / NCR",
-    "experience": "5 - 8 Years",
-    "salary": "",
-    "url": "https://www.naukri.com/mnjuser/inbox?utmMedium=email&xp=2&src=rmj_digest&utmSource=rmj_digest_tuple&mailId=180826818633&vCardId=126122627&pMessageId=180826818633&pVCardId=126122627&type=digestNvite",
-    "matchScore": 10,
-    "emailSubject": "You have a new job in your inbox!",
-    "emailDate": "Tue, 18 Aug 2026 16:34:46 +0530 (IST)",
-    "source": "Naukri Gmail Alert"
+    "jobId": "120826023990",
+    "title": "angular developer bounteous",
+    "company": "Bounteous",
+    "location": "Bengaluru, Hybrid",
+    "experience": {
+      "min": 5,
+      "max": 7,
+      "text": "5 - 7 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-angular-developer-bounteous-bengaluru-5-to-7-years-120826023990",
+    "rawText": "Angular Developer Bounteous 3.1 Hybrid - Bengaluru Angular Developer Bounteous 3.1 Hybrid - Bengaluru Angular Developer Bounteous 3.1 Hybrid - Bengaluru",
+    "match": {
+      "score": 69,
+      "category": "GOOD",
+      "reasons": [
+        "Strong Angular match",
+        "Target frontend role",
+        "Experience range is close",
+        "Preferred location"
+      ],
+      "skills": {
+        "primary": [
+          "angular"
+        ],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 69,
+    "category": "GOOD"
+  },
+  {
+    "jobId": "120826919473",
+    "title": "angular developer quantsapp pvt ltd",
+    "company": "Quantsapp Pvt Ltd",
+    "location": "Mumbai",
+    "experience": {
+      "min": 5,
+      "max": 10,
+      "text": "5 - 10 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-angular-developer-quantsapp-pvt-ltd-mumbai-5-to-10-years-120826919473",
+    "rawText": "Angular Developer Quantsapp 3.2 Mumbai Angular Developer Quantsapp 3.2 Mumbai Angular Developer Quantsapp 3.2 Mumbai",
+    "match": {
+      "score": 54,
+      "category": "POSSIBLE",
+      "reasons": [
+        "Strong Angular match",
+        "Target frontend role",
+        "Experience range is close"
+      ],
+      "skills": {
+        "primary": [
+          "angular"
+        ],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 54,
+    "category": "POSSIBLE"
+  },
+  {
+    "jobId": "130826924912",
+    "title": "senior lead angular developer reserve bank information technology",
+    "company": "Senior Lead Angular Developer Reserve Bank Information Technology",
+    "location": "Mumbai",
+    "experience": {
+      "min": 4,
+      "max": 8,
+      "text": "4 - 8 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-senior-lead-angular-developer-reserve-bank-information-technology-mumbai-all-areas-4-to-8-years-130826924912",
+    "rawText": "Senior / Lead Angular Developer Reserve Bank Inform... 3.2 Mumbai (All Areas) Senior / Lead Angular Developer Reserve Bank Inform... 3.2 Mumbai (All Areas) Senior / Lead Angular Developer Reserve Bank Inform... 3.2 Mumbai (All Areas)",
+    "match": {
+      "score": 73,
+      "category": "GOOD",
+      "reasons": [
+        "Strong Angular match",
+        "Target frontend role",
+        "Experience range matches",
+        "Senior-level role",
+        "Lead-level opportunity"
+      ],
+      "skills": {
+        "primary": [
+          "angular"
+        ],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 73,
+    "category": "GOOD"
+  },
+  {
+    "jobId": "120826920287",
+    "title": "ui developer frontend technologies html css sadup softech",
+    "company": "Frontend Technologies Html Css Sadup Softech",
+    "location": "Bengaluru, Mumbai, Delhi",
+    "experience": {
+      "min": 3,
+      "max": 6,
+      "text": "3 - 6 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-ui-developer-frontend-technologies-html-css-sadup-softech-mumbai-delhi-ncr-bengaluru-3-to-6-years-120826920287",
+    "rawText": "UI Developer - Frontend Technologies - HTML / CSS Sadup Soft 4.2 Mumbai, Delhi / N... UI Developer - Frontend Technologies - HTML / CSS Sadup Soft 4.2 Mumbai, Delhi / N... UI Developer - Frontend Technologies - HTML / CSS Sadup Soft 4.2 Mumbai, Delhi / N...",
+    "match": {
+      "score": 47,
+      "category": "POSSIBLE",
+      "reasons": [
+        "Target frontend role",
+        "Experience range matches",
+        "Preferred location"
+      ],
+      "skills": {
+        "primary": [
+          "html",
+          "css",
+          "frontend"
+        ],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 47,
+    "category": "POSSIBLE"
+  },
+  {
+    "jobId": "130826910947",
+    "title": "senior frontend developer react js javascript unico connect private limited",
+    "company": "React Js Javascript Unico Connect Private Limited",
+    "location": "Mumbai",
+    "experience": {
+      "min": 3,
+      "max": 6,
+      "text": "3 - 6 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-senior-frontend-developer-react-js-javascript-unico-connect-private-limited-mumbai-3-to-6-years-130826910947",
+    "rawText": "Senior Frontend Developer - React.js / JavaScript Unicon Connectors Mumbai Senior Frontend Developer - React.js / JavaScript Unicon Connectors Mumbai Senior Frontend Developer - React.js / JavaScript Unicon Connectors Mumbai",
+    "match": {
+      "score": 32,
+      "category": "SKIP",
+      "reasons": [
+        "Target frontend role",
+        "Experience range matches",
+        "Senior-level role",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [
+          "javascript",
+          "frontend"
+        ],
+        "secondary": [],
+        "transferable": [
+          "react",
+          "react.js"
+        ]
+      }
+    },
+    "score": 32,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "140826029032",
+    "title": "react developer l a bbeib bounteous",
+    "company": "L A Bbeib Bounteous",
+    "location": "Bengaluru",
+    "experience": {
+      "min": 2,
+      "max": 5,
+      "text": "2 - 5 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-react-developer-l-a-bbeib-bounteous-bengaluru-2-to-5-years-140826029032",
+    "rawText": "React developer-L-A-BBEIB Bounteous 3.1 Bengaluru React developer-L-A-BBEIB Bounteous 3.1 Bengaluru React developer-L-A-BBEIB Bounteous 3.1 Bengaluru",
+    "match": {
+      "score": 23,
+      "category": "SKIP",
+      "reasons": [
+        "Experience range matches",
+        "Preferred location",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [],
+        "secondary": [],
+        "transferable": [
+          "react"
+        ]
+      }
+    },
+    "score": 23,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "130826009822",
+    "title": "angular developer codincity digital technologies",
+    "company": "Codincity Digital Technologies",
+    "location": "Bengaluru, Hybrid",
+    "experience": {
+      "min": 3,
+      "max": 7,
+      "text": "3 - 7 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-angular-developer-codincity-digital-technologies-bengaluru-3-to-7-years-130826009822",
+    "rawText": "Angular Developer Codincity Digital T... 4.8 Hybrid - Bengaluru Angular Developer Codincity Digital T... 4.8 Hybrid - Bengaluru Angular Developer Codincity Digital T... 4.8 Hybrid - Bengaluru",
+    "match": {
+      "score": 77,
+      "category": "GOOD",
+      "reasons": [
+        "Strong Angular match",
+        "Target frontend role",
+        "Experience range matches",
+        "Preferred location"
+      ],
+      "skills": {
+        "primary": [
+          "angular"
+        ],
+        "secondary": [
+          "git"
+        ],
+        "transferable": []
+      }
+    },
+    "score": 77,
+    "category": "GOOD"
+  },
+  {
+    "jobId": "130826910941",
+    "title": "frontend developer react js unico connect private limited",
+    "company": "React Js Unico Connect Private Limited",
+    "location": "Mumbai",
+    "experience": {
+      "min": 3,
+      "max": 5,
+      "text": "3 - 5 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-frontend-developer-react-js-unico-connect-private-limited-mumbai-3-to-5-years-130826910941",
+    "rawText": "Frontend Developer - React.js Unicon Connectors Mumbai Frontend Developer - React.js Unicon Connectors Mumbai Frontend Developer - React.js Unicon Connectors Mumbai",
+    "match": {
+      "score": 20,
+      "category": "SKIP",
+      "reasons": [
+        "Target frontend role",
+        "Experience range matches",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [
+          "frontend"
+        ],
+        "secondary": [],
+        "transferable": [
+          "react",
+          "react.js"
+        ]
+      }
+    },
+    "score": 20,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "130826924914",
+    "title": "senior lead angular developer reserve bank information technology",
+    "company": "Senior Lead Angular Developer Reserve Bank Information Technology",
+    "location": "Mumbai",
+    "experience": {
+      "min": 4,
+      "max": 8,
+      "text": "4 - 8 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-senior-lead-angular-developer-reserve-bank-information-technology-mumbai-all-areas-4-to-8-years-130826924914",
+    "rawText": "Senior / Lead Angular Developer Reserve Bank Inform... 3.2 Mumbai (All Areas) Senior / Lead Angular Developer Reserve Bank Inform... 3.2 Mumbai (All Areas) Senior / Lead Angular Developer Reserve Bank Inform... 3.2 Mumbai (All Areas)",
+    "match": {
+      "score": 73,
+      "category": "GOOD",
+      "reasons": [
+        "Strong Angular match",
+        "Target frontend role",
+        "Experience range matches",
+        "Senior-level role",
+        "Lead-level opportunity"
+      ],
+      "skills": {
+        "primary": [
+          "angular"
+        ],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 73,
+    "category": "GOOD"
+  },
+  {
+    "jobId": "140826010354",
+    "title": "senior ui engineer 1finity a fujitsu company",
+    "company": "Senior Ui Engineer 1finity A Fujitsu Company",
+    "location": "Bengaluru",
+    "experience": {
+      "min": 3,
+      "max": 7,
+      "text": "3 - 7 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-senior-ui-engineer-1finity-a-fujitsu-company-bengaluru-3-to-7-years-140826010354",
+    "rawText": "Senior Ui Engineer 1finity - A Fujitsu... 3.8 Bengaluru Senior Ui Engineer 1finity - A Fujitsu... 3.8 Bengaluru Senior Ui Engineer 1finity - A Fujitsu... 3.8 Bengaluru",
+    "match": {
+      "score": 53,
+      "category": "POSSIBLE",
+      "reasons": [
+        "Target frontend role",
+        "Experience range matches",
+        "Preferred location",
+        "Senior-level role"
+      ],
+      "skills": {
+        "primary": [],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 53,
+    "category": "POSSIBLE"
+  },
+  {
+    "jobId": "140826011405",
+    "title": "senior full stack developer the glove",
+    "company": "Senior Full Stack Developer The Glove",
+    "location": "Bengaluru",
+    "experience": {
+      "min": 1,
+      "max": 6,
+      "text": "1 - 6 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-senior-full-stack-developer-the-glove-bengaluru-india-1-to-6-years-140826011405",
+    "rawText": "Senior Full Stack Developer The Glove India, Bengaluru Senior Full Stack Developer The Glove India, Bengaluru Senior Full Stack Developer The Glove India, Bengaluru",
+    "match": {
+      "score": 33,
+      "category": "SKIP",
+      "reasons": [
+        "Experience range matches",
+        "Preferred location",
+        "Senior-level role",
+        "Full-stack focused role"
+      ],
+      "skills": {
+        "primary": [],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 33,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "140826927206",
+    "title": "front end react developer luxoft india llp",
+    "company": "Front End React Developer Luxoft India Llp",
+    "location": "Pune",
+    "experience": {
+      "min": 3,
+      "max": 6,
+      "text": "3 - 6 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-front-end-react-developer-luxoft-india-llp-pune-3-to-6-years-140826927206",
+    "rawText": "Front-end React Developer Luxoft 3.6 Pune Front-end React Developer Luxoft 3.6 Pune Front-end React Developer Luxoft 3.6 Pune",
+    "match": {
+      "score": 35,
+      "category": "SKIP",
+      "reasons": [
+        "Target frontend role",
+        "Experience range matches",
+        "Preferred location",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [
+          "front end"
+        ],
+        "secondary": [],
+        "transferable": [
+          "react"
+        ]
+      }
+    },
+    "score": 35,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "130826033418",
+    "title": "react developer bodhi hr solutions",
+    "company": "Bodhi Hr Solutions",
+    "location": "Bengaluru",
+    "experience": {
+      "min": 6,
+      "max": 11,
+      "text": "6 - 11 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-react-developer-bodhi-hr-solutions-bengaluru-6-to-11-years-130826033418",
+    "rawText": "React Developer Bodhi Hr Solutions Bengaluru(Koraman... React Developer Bodhi Hr Solutions Bengaluru(Koraman... React Developer Bodhi Hr Solutions Bengaluru(Koraman...",
+    "match": {
+      "score": 9,
+      "category": "SKIP",
+      "reasons": [
+        "Experience is reasonably close",
+        "Preferred location",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [],
+        "secondary": [],
+        "transferable": [
+          "react"
+        ]
+      }
+    },
+    "score": 9,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "130826031518",
+    "title": "react js developer quest global",
+    "company": "Quest Global",
+    "location": "Bengaluru",
+    "experience": {
+      "min": 5,
+      "max": 8,
+      "text": "5 - 8 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-react-js-developer-quest-global-bengaluru-5-to-8-years-130826031518",
+    "rawText": "React JS Developer Quest Global 3.5 Bengaluru React JS Developer Quest Global 3.5 Bengaluru React JS Developer Quest Global 3.5 Bengaluru",
+    "match": {
+      "score": 15,
+      "category": "SKIP",
+      "reasons": [
+        "Experience range is close",
+        "Preferred location",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [],
+        "secondary": [],
+        "transferable": [
+          "react"
+        ]
+      }
+    },
+    "score": 15,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "050826030854",
+    "title": "react developer pan india infosys",
+    "company": "Pan India Infosys",
+    "location": "Bengaluru, Hyderabad, Chennai, Hybrid",
+    "experience": {
+      "min": 5,
+      "max": 8,
+      "text": "5 - 8 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-react-developer-pan-india-infosys-hyderabad-chennai-bengaluru-5-to-8-years-050826030854",
+    "rawText": "react developer- Pan India Infosys 3.5 Hybrid - Hyderaba... Women candidates preferred react developer- Pan India Infosys 3.5 Hybrid - Hyderaba... Women candidates preferred react developer- Pan India Infosys 3.5 Hybrid - Hyderaba... Women candidates preferred",
+    "match": {
+      "score": 15,
+      "category": "SKIP",
+      "reasons": [
+        "Experience range is close",
+        "Preferred location",
+        "React-focused rather than Angular-focused"
+      ],
+      "skills": {
+        "primary": [],
+        "secondary": [],
+        "transferable": [
+          "react"
+        ]
+      }
+    },
+    "score": 15,
+    "category": "SKIP"
+  },
+  {
+    "jobId": "130826013660",
+    "title": "front end engineer aqilea",
+    "company": "Aqilea",
+    "location": "Bengaluru, Hybrid",
+    "experience": {
+      "min": 7,
+      "max": 12,
+      "text": "7 - 12 Years"
+    },
+    "url": "https://www.naukri.com/jd/job-listings-front-end-engineer-aqilea-bengaluru-7-to-12-years-130826013660",
+    "rawText": "Front End Engineer Aqilea Hybrid - Bengaluru Front End Engineer Aqilea Hybrid - Bengaluru Front End Engineer Aqilea Hybrid - Bengaluru",
+    "match": {
+      "score": 15,
+      "category": "SKIP",
+      "reasons": [
+        "Preferred location"
+      ],
+      "skills": {
+        "primary": [
+          "front end"
+        ],
+        "secondary": [],
+        "transferable": []
+      }
+    },
+    "score": 15,
+    "category": "SKIP"
   }
 ]

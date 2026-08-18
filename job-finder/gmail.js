@@ -1,570 +1,1163 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
+const { google } = require("googleapis");
+const { authenticate } = require("@google-cloud/local-auth");
+const cheerio = require("cheerio");
 
-const { authenticate } = require('@google-cloud/local-auth');
-const { google } = require('googleapis');
-const cheerio = require('cheerio');
-
-// =====================================================
+// ============================================================
 // CONFIGURATION
-// =====================================================
+// ============================================================
 
-const SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly'
-];
+const ROOT_DIR = path.join(__dirname, "..");
 
 const CREDENTIALS_PATH = path.join(
-    __dirname,
-    '..',
-    'credentials',
-    'credentials.json'
+    ROOT_DIR,
+    "credentials",
+    "credentials.json"
 );
 
-const OUTPUT_DIR = path.join(
-    __dirname,
-    'email-dump'
+const TOKEN_PATH = path.join(
+    ROOT_DIR,
+    "credentials",
+    "token.json"
 );
 
-const JOBS_FILE = path.join(
+const EMAIL_DUMP_DIR = path.join(
     __dirname,
-    'jobs.json'
+    "email-dump"
 );
 
-// =====================================================
-// REGEX
-// =====================================================
+const JOBS_PATH = path.join(
+    __dirname,
+    "jobs.json"
+);
 
-const EXPERIENCE_REGEX =
-    /\b\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\s*Years?\b/i;
+const MATCHED_JOBS_PATH = path.join(
+    __dirname,
+    "matched-jobs.json"
+);
 
-// =====================================================
-// HELPERS
-// =====================================================
+const PROFILE = {
+    name: "Animesh Pandey",
 
-function cleanText(value) {
-    return String(value || '')
-        .replace(/\u00a0/g, ' ')
-        .replace(/\r/g, ' ')
-        .replace(/\n/g, ' ')
-        .replace(/\t/g, ' ')
-        .replace(/\s+/g, ' ')
+    experienceYears: 4.1,
+
+    targetRoles: [
+        "angular developer",
+        "senior angular developer",
+        "lead angular developer",
+        "frontend developer",
+        "senior frontend developer",
+        "ui developer",
+        "ui engineer",
+        "frontend engineer",
+        "software engineer frontend",
+        "software developer frontend"
+    ],
+
+    preferredLocations: [
+        "bengaluru",
+        "bangalore",
+        "pune",
+        "noida",
+        "lucknow"
+    ],
+
+    acceptableLocations: [
+        "delhi",
+        "delhi ncr",
+        "gurugram",
+        "gurgaon",
+        "hyderabad",
+        "remote",
+        "hybrid"
+    ],
+
+    primarySkills: [
+        "angular",
+        "typescript",
+        "javascript",
+        "html",
+        "css",
+        "frontend",
+        "front end",
+        "rxjs",
+        "angular material"
+    ],
+
+    secondarySkills: [
+        "node.js",
+        "nodejs",
+        "express",
+        "rest api",
+        "restful",
+        "git",
+        "azure devops",
+        "playwright",
+        "d3.js",
+        "excel",
+        "npm"
+    ],
+
+    transferableSkills: [
+        "react",
+        "react.js",
+        "reactjs"
+    ]
+};
+
+// Gmail scopes
+const SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send"
+];
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+function ensureDirectories() {
+    fs.mkdirSync(path.dirname(TOKEN_PATH), {
+        recursive: true
+    });
+
+    fs.mkdirSync(EMAIL_DUMP_DIR, {
+        recursive: true
+    });
+}
+
+function normalizeText(value = "") {
+    return value
+        .replace(/\u00a0/g, " ")
+        .replace(/\s+/g, " ")
         .trim();
 }
 
-function decodeBase64(data) {
-    if (!data) {
-        return '';
-    }
-
-    return Buffer
-        .from(
-            data
-                .replace(/-/g, '+')
-                .replace(/_/g, '/'),
-            'base64'
-        )
-        .toString('utf8');
-}
-
-function getHeader(headers, name) {
-    const header = headers.find(
-        item =>
-            item.name.toLowerCase() ===
-            name.toLowerCase()
+function cleanText(value = "") {
+    return normalizeText(
+        value
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
     );
-
-    return header
-        ? header.value
-        : '';
 }
 
-// =====================================================
-// EXTRACT HTML BODY
-// =====================================================
+function lower(value = "") {
+    return normalizeText(value).toLowerCase();
+}
 
-function extractHtml(payload) {
+function escapeHtml(value = "") {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    if (!payload) {
-        return '';
-    }
+function decodeHtml(value = "") {
+    return value
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&nbsp;/gi, " ");
+}
 
-    if (
-        payload.mimeType === 'text/html' &&
-        payload.body &&
-        payload.body.data
-    ) {
-        return decodeBase64(
-            payload.body.data
+// ============================================================
+// GOOGLE AUTH
+// ============================================================
+
+async function authorize() {
+    console.log("Starting Google authentication...");
+
+    if (!fs.existsSync(CREDENTIALS_PATH)) {
+        throw new Error(
+            `Gmail credentials not found:\n${CREDENTIALS_PATH}`
         );
     }
 
-    if (payload.parts) {
+    let auth;
 
-        for (const part of payload.parts) {
+    if (fs.existsSync(TOKEN_PATH)) {
+        try {
+            const token = JSON.parse(
+                fs.readFileSync(TOKEN_PATH, "utf8")
+            );
 
-            const html =
-                extractHtml(part);
+            const installed =
+                token.installed ||
+                token.web ||
+                token;
 
-            if (html) {
-                return html;
+            const clientId =
+                installed.client_id;
+
+            const clientSecret =
+                installed.client_secret;
+
+            const redirectUri =
+                installed.redirect_uris?.[0] ||
+                "http://localhost";
+
+            if (clientId && clientSecret) {
+                auth = new google.auth.OAuth2(
+                    clientId,
+                    clientSecret,
+                    redirectUri
+                );
+
+                auth.setCredentials(token);
+
+                console.log(
+                    "Existing Gmail authentication loaded."
+                );
+            }
+        } catch (error) {
+            console.log(
+                "Existing token could not be loaded. Re-authenticating..."
+            );
+        }
+    }
+
+    if (!auth) {
+        auth = await authenticate({
+            keyfilePath: CREDENTIALS_PATH,
+            scopes: SCOPES
+        });
+
+        fs.writeFileSync(
+            TOKEN_PATH,
+            JSON.stringify(auth.credentials, null, 2)
+        );
+
+        console.log(
+            "New Gmail authentication saved."
+        );
+    }
+
+    console.log("Google authentication successful.");
+
+    return auth;
+}
+
+// ============================================================
+// GMAIL HELPERS
+// ============================================================
+
+function decodeBase64(data = "") {
+    return Buffer.from(
+        data.replace(/-/g, "+").replace(/_/g, "/"),
+        "base64"
+    ).toString("utf8");
+}
+
+function extractBody(payload) {
+    if (!payload) {
+        return {
+            html: "",
+            text: ""
+        };
+    }
+
+    let html = "";
+    let text = "";
+
+    function walk(part) {
+        if (!part) return;
+
+        const mimeType = part.mimeType || "";
+
+        if (
+            mimeType === "text/html" &&
+            part.body &&
+            part.body.data
+        ) {
+            html += decodeBase64(part.body.data);
+        }
+
+        if (
+            mimeType === "text/plain" &&
+            part.body &&
+            part.body.data
+        ) {
+            text += decodeBase64(part.body.data);
+        }
+
+        if (Array.isArray(part.parts)) {
+            for (const child of part.parts) {
+                walk(child);
             }
         }
     }
 
-    return '';
+    walk(payload);
+
+    return {
+        html,
+        text
+    };
 }
 
-// =====================================================
-// VALID JOB URL
-// =====================================================
+function getHeader(headers, name) {
+    const header = headers?.find(
+        h => lower(h.name) === lower(name)
+    );
 
-function isValidJobUrl(url) {
+    return header?.value || "";
+}
 
-    if (!url) {
-        return false;
+// ============================================================
+// EXPERIENCE EXTRACTION
+// ============================================================
+
+function parseExperience(text = "") {
+    const value = normalizeText(text);
+
+    const patterns = [
+        /(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)/i,
+
+        /(\d+(?:\.\d+)?)\s*\+\s*(?:years?|yrs?)/i,
+
+        /experience\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)/i,
+
+        /(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\s*(?:experience)?/i
+    ];
+
+    for (const pattern of patterns) {
+        const match = value.match(pattern);
+
+        if (!match) continue;
+
+        if (match[2]) {
+            return {
+                min: Number(match[1]),
+                max: Number(match[2]),
+                text: `${match[1]} - ${match[2]} Years`
+            };
+        }
+
+        if (match[1]) {
+            const min = Number(match[1]);
+
+            return {
+                min,
+                max: min,
+                text: `${min}+ Years`
+            };
+        }
+    }
+
+    return null;
+}
+
+function extractExperienceFromUrl(url = "") {
+    if (!url) return null;
+
+    const decoded = decodeURIComponent(url);
+
+    // Example:
+    // bengaluru-3-to-7-years-130826009822
+    let match = decoded.match(
+        /(\d+(?:\.\d+)?)-to-(\d+(?:\.\d+)?)-years/i
+    );
+
+    if (match) {
+        return {
+            min: Number(match[1]),
+            max: Number(match[2]),
+            text: `${match[1]} - ${match[2]} Years`
+        };
+    }
+
+    match = decoded.match(
+        /(\d+(?:\.\d+)?)[-_](\d+(?:\.\d+)?)[-_]years/i
+    );
+
+    if (match) {
+        return {
+            min: Number(match[1]),
+            max: Number(match[2]),
+            text: `${match[1]} - ${match[2]} Years`
+        };
+    }
+
+    return null;
+}
+
+// ============================================================
+// LOCATION
+// ============================================================
+
+function extractLocation(text = "", url = "") {
+    const combined = normalizeText(
+        `${text} ${url}`
+    );
+
+    const locations = [
+        "bengaluru",
+        "bangalore",
+        "pune",
+        "noida",
+        "lucknow",
+        "mumbai",
+        "hyderabad",
+        "delhi",
+        "delhi ncr",
+        "gurugram",
+        "gurgaon",
+        "kolkata",
+        "chennai",
+        "remote",
+        "hybrid"
+    ];
+
+    const found = [];
+
+    const lowerText = lower(combined);
+
+    for (const location of locations) {
+        if (lowerText.includes(location)) {
+            found.push(location);
+        }
+    }
+
+    if (found.length === 0) {
+        return "Not detected";
+    }
+
+    const unique = [...new Set(found)];
+
+    if (
+        unique.includes("bengaluru") &&
+        unique.includes("bangalore")
+    ) {
+        return "Bengaluru";
+    }
+
+    return unique
+        .map(x =>
+            x.charAt(0).toUpperCase() + x.slice(1)
+        )
+        .join(", ");
+}
+
+// ============================================================
+// JOB ID / URL
+// ============================================================
+
+function extractJobId(url = "") {
+    if (!url) return null;
+
+    const match = url.match(
+        /job-listings-[^?#]*-(\d{8,})/i
+    );
+
+    if (match) {
+        return match[1];
+    }
+
+    const direct = url.match(
+        /(?:jobId|jobid|job_id)=(\d{6,})/i
+    );
+
+    return direct ? direct[1] : null;
+}
+
+function cleanNaukriUrl(url = "") {
+    if (!url) return "";
+
+    try {
+        const parsed = new URL(url);
+
+        if (
+            parsed.hostname.includes("naukri.com")
+        ) {
+            const pathName = parsed.pathname;
+
+            if (
+                pathName.includes("/jd/job-listings-")
+            ) {
+                return `https://www.naukri.com${pathName}`;
+            }
+        }
+    } catch {
+        // Ignore invalid URL
+    }
+
+    return url;
+}
+
+// ============================================================
+// TITLE EXTRACTION
+// ============================================================
+
+function cleanJobTitle(title = "") {
+    let result = normalizeText(title);
+
+    result = result
+        .replace(
+            /\s+\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\s*Years?.*$/i,
+            ""
+        )
+        .replace(
+            /\s+\d+(?:\.\d+)?\s*to\s*\d+(?:\.\d+)?\s*Years?.*$/i,
+            ""
+        );
+
+    result = result
+        .replace(/\s*[-|]\s*Bengaluru.*$/i, "")
+        .replace(/\s*[-|]\s*Bangalore.*$/i, "")
+        .replace(/\s*[-|]\s*Pune.*$/i, "")
+        .replace(/\s*[-|]\s*Mumbai.*$/i, "")
+        .replace(/\s*[-|]\s*Delhi.*$/i, "");
+
+    return normalizeText(result);
+}
+
+function extractTitleFromUrl(url = "") {
+    if (!url) return "";
+
+    try {
+        const parsed = new URL(url);
+
+        const path = parsed.pathname;
+
+        const match = path.match(
+            /job-listings-(.+)-\d{8,}$/i
+        );
+
+        if (!match) return "";
+
+        let title = match[1];
+
+        title = title.replace(
+            /-(?:bengaluru|bangalore|pune|mumbai|delhi|hyderabad|chennai|noida|lucknow).*$/i,
+            ""
+        );
+
+        title = title.replace(
+            /-\d+(?:\.\d+)?-to-\d+(?:\.\d+)?-years.*$/i,
+            ""
+        );
+
+        title = title.replace(/-/g, " ");
+
+        return cleanJobTitle(title);
+    } catch {
+        return "";
+    }
+}
+
+// ============================================================
+// COMPANY EXTRACTION
+// ============================================================
+
+function extractCompanyFromUrl(url = "") {
+    if (!url) return "";
+
+    try {
+        const parsed = new URL(url);
+
+        const path = parsed.pathname;
+
+        const match = path.match(
+            /job-listings-(.+)-\d{8,}$/i
+        );
+
+        if (!match) return "";
+
+        const slug = match[1];
+
+        const experienceMatch = slug.match(
+            /-(\d+(?:\.\d+)?)-to-(\d+(?:\.\d+)?)-years/i
+        );
+
+        let beforeExperience = experienceMatch
+            ? slug.substring(
+                0,
+                experienceMatch.index
+            )
+            : slug;
+
+        const locationMatch =
+            beforeExperience.match(
+                /-(bengaluru|bangalore|pune|mumbai|delhi|hyderabad|chennai|noida|lucknow|gurgaon|gurugram).*$/i
+            );
+
+        if (locationMatch) {
+            beforeExperience =
+                beforeExperience.substring(
+                    0,
+                    locationMatch.index
+                );
+        }
+
+        const titleKeywords = [
+            "angular-developer",
+            "senior-angular-developer",
+            "lead-angular-developer",
+            "frontend-developer",
+            "front-end-developer",
+            "senior-frontend-developer",
+            "react-developer",
+            "react-js-developer",
+            "ui-developer",
+            "ui-engineer",
+            "front-end-engineer"
+        ];
+
+        for (const keyword of titleKeywords) {
+            if (
+                beforeExperience.startsWith(
+                    keyword + "-"
+                )
+            ) {
+                beforeExperience =
+                    beforeExperience.substring(
+                        keyword.length + 1
+                    );
+                break;
+            }
+        }
+
+        if (!beforeExperience) {
+            return "";
+        }
+
+        return beforeExperience
+            .replace(/-/g, " ")
+            .replace(/\b\w/g, c => c.toUpperCase())
+            .trim();
+
+    } catch {
+        return "";
+    }
+}
+
+// ============================================================
+// SKILLS
+// ============================================================
+
+function findSkills(text = "") {
+    const content = lower(text);
+
+    const primary = PROFILE.primarySkills.filter(
+        skill => content.includes(lower(skill))
+    );
+
+    const secondary = PROFILE.secondarySkills.filter(
+        skill => content.includes(lower(skill))
+    );
+
+    const transferable =
+        PROFILE.transferableSkills.filter(
+            skill => content.includes(lower(skill))
+        );
+
+    return {
+        primary: [...new Set(primary)],
+        secondary: [...new Set(secondary)],
+        transferable: [...new Set(transferable)]
+    };
+}
+
+// ============================================================
+// ROLE DETECTION
+// ============================================================
+
+function detectRoleType(title = "", text = "") {
+    const combined = lower(
+        `${title} ${text}`
+    );
+
+    return {
+        angular:
+            /\bangular\b/i.test(combined),
+
+        frontend:
+            /\b(frontend|front-end|ui developer|ui engineer)\b/i.test(
+                combined
+            ),
+
+        react:
+            /\b(react|react\.js|reactjs)\b/i.test(
+                combined
+            ),
+
+        senior:
+            /\b(senior|sr\.?)\b/i.test(
+                combined
+            ),
+
+        lead:
+            /\b(lead|principal)\b/i.test(
+                combined
+            )
+    };
+}
+
+// ============================================================
+// MATCH SCORING
+// ============================================================
+
+function calculateMatch(job) {
+    const title = lower(job.title);
+    const description = lower(
+        `${job.title} ${job.rawText}`
+    );
+
+    const role = detectRoleType(
+        job.title,
+        description
+    );
+
+    const skills = findSkills(description);
+
+    let score = 0;
+
+    const reasons = [];
+
+    // --------------------------------------------------------
+    // Angular - strongest signal
+    // --------------------------------------------------------
+
+    if (role.angular) {
+        score += 30;
+        reasons.push("Strong Angular match");
+    }
+
+    // --------------------------------------------------------
+    // Target frontend role
+    // --------------------------------------------------------
+
+    if (
+        role.frontend ||
+        PROFILE.targetRoles.some(
+            r => title.includes(r)
+        )
+    ) {
+        score += 12;
+        reasons.push("Target frontend role");
+    }
+
+    // --------------------------------------------------------
+    // Primary technologies
+    // --------------------------------------------------------
+
+    if (
+        skills.primary.includes("typescript")
+    ) {
+        score += 8;
     }
 
     if (
-        !url.startsWith(
-            'https://www.naukri.com/'
-        )
+        skills.primary.includes("javascript")
     ) {
-        return false;
+        score += 6;
     }
 
-    const lower =
-        url.toLowerCase();
+    if (
+        skills.primary.includes("rxjs")
+    ) {
+        score += 5;
+    }
 
-    /*
-     * These are definitely NOT job links.
-     */
-    const invalid = [
-        'feedback',
-        'fdbck',
-        'security',
-        'termsconditions',
-        'unsubscribe',
-        '/durl/',
-        'settings',
-        'view_all'
-    ];
+    if (
+        skills.primary.includes("angular material")
+    ) {
+        score += 4;
+    }
 
-    return !invalid.some(
-        value =>
-            lower.includes(value)
+    // --------------------------------------------------------
+    // Secondary technologies
+    // --------------------------------------------------------
+
+    const relevantSecondary =
+        skills.secondary.filter(
+            skill =>
+                skill !== "git" &&
+                skill !== "npm"
+        );
+
+    if (relevantSecondary.length > 0) {
+        score += Math.min(
+            relevantSecondary.length * 2,
+            6
+        );
+    }
+
+    // --------------------------------------------------------
+    // Experience
+    // --------------------------------------------------------
+
+    if (job.experience) {
+        const min = job.experience.min;
+        const max = job.experience.max;
+        const userExp = PROFILE.experienceYears;
+
+        if (
+            userExp >= min &&
+            userExp <= max
+        ) {
+            score += 20;
+            reasons.push(
+                "Experience range matches"
+            );
+        } else if (
+            userExp >= min - 1 &&
+            userExp <= max + 1
+        ) {
+            score += 12;
+            reasons.push(
+                "Experience range is close"
+            );
+        } else if (
+            userExp >= min - 2 &&
+            userExp <= max + 2
+        ) {
+            score += 6;
+            reasons.push(
+                "Experience is reasonably close"
+            );
+        }
+    }
+
+    // --------------------------------------------------------
+    // Location
+    // --------------------------------------------------------
+
+    const location = lower(
+        job.location
     );
+
+    const preferred =
+        PROFILE.preferredLocations.some(
+            x => location.includes(x)
+        );
+
+    const acceptable =
+        PROFILE.acceptableLocations.some(
+            x => location.includes(x)
+        );
+
+    if (preferred) {
+        score += 15;
+        reasons.push(
+            "Preferred location"
+        );
+    } else if (acceptable) {
+        score += 7;
+        reasons.push(
+            "Acceptable location"
+        );
+    }
+
+    // --------------------------------------------------------
+    // Senior / Lead
+    // --------------------------------------------------------
+
+    if (role.senior) {
+        score += 6;
+        reasons.push(
+            "Senior-level role"
+        );
+    }
+
+    if (role.lead) {
+        score += 5;
+        reasons.push(
+            "Lead-level opportunity"
+        );
+    }
+
+    // --------------------------------------------------------
+    // React penalty
+    // --------------------------------------------------------
+
+    if (
+        role.react &&
+        !role.angular
+    ) {
+        score -= 12;
+
+        reasons.push(
+            "React-focused rather than Angular-focused"
+        );
+    }
+
+    // --------------------------------------------------------
+    // Full stack penalty
+    // --------------------------------------------------------
+
+    if (
+        /\bfull\s*stack\b/i.test(title)
+    ) {
+        score -= 8;
+
+        reasons.push(
+            "Full-stack focused role"
+        );
+    }
+
+    // --------------------------------------------------------
+    // Clamp
+    // --------------------------------------------------------
+
+    score = Math.max(
+        0,
+        Math.min(100, score)
+    );
+
+    let category;
+
+    if (score >= 80) {
+        category = "EXCELLENT";
+    } else if (score >= 65) {
+        category = "GOOD";
+    } else if (score >= 45) {
+        category = "POSSIBLE";
+    } else {
+        category = "SKIP";
+    }
+
+    return {
+        score,
+        category,
+        reasons,
+        skills
+    };
 }
 
-// =====================================================
-// EXTRACT JOBS FROM NAUKRI HTML
-// =====================================================
+// ============================================================
+// JOB EXTRACTION
+// ============================================================
 
-function extractJobsFromHtml(
-    html,
-    emailSubject,
-    emailDate
-) {
+function extractJobCards(html) {
     const $ = cheerio.load(html);
 
     const jobs = [];
 
-    /*
-     * Naukri email structure:
-     *
-     * One job card contains:
-     *
-     *   td.jb_title  -> Job Title
-     *   td.jb_dt     -> Location
-     *   td.jb_dt     -> Experience
-     *   td.jb_title  -> Company
-     *
-     * Therefore we MUST process the CARD,
-     * not every td.jb_title individually.
-     */
+    const links = $("a[href]");
 
-    $('td.jb_title').each(
-        (index, titleElement) => {
+    links.each((index, element) => {
+        const href = $(element).attr("href");
 
-            /*
-             * Only process the FIRST jb_title
-             * belonging to a job card.
-             *
-             * If this jb_title is already inside
-             * another jb_title/card structure,
-             * don't treat it as a new job.
-             */
+        if (!href) return;
 
-            const title =
-                cleanText(
-                    $(titleElement)
-                        .clone()
-                        .children()
-                        .remove()
-                        .end()
-                        .text()
-                );
-
-            if (!title) {
-                return;
-            }
-
-            /*
-             * Find the nearest parent anchor.
-             */
-            const cardLink =
-                $(titleElement).closest('a');
-
-            if (!cardLink.length) {
-                return;
-            }
-
-            const href =
-                cardLink.attr('href') || '';
-
-            /*
-             * Ignore footer/navigation links.
-             */
-            if (
-                /security|feedback|fdbck|termsconditions|unsubscribe/i
-                    .test(href)
-            ) {
-                return;
-            }
-
-            /*
-             * Get the complete card text.
-             */
-            const cardText =
-                cleanText(
-                    cardLink.text()
-                );
-
-            /*
-             * A real job card MUST contain experience.
-             */
-            const experienceMatch =
-                cardText.match(
-                    EXPERIENCE_REGEX
-                );
-
-            if (!experienceMatch) {
-                return;
-            }
-
-            /*
-             * A real job card MUST contain a location.
-             */
-            let location = '';
-
-            cardLink
-                .find('td.jb_dt')
-                .each(
-                    (i, element) => {
-
-                        const text =
-                            cleanText(
-                                $(element).text()
-                            );
-
-                        if (
-                            !location &&
-                            /Bengaluru|Bangalore|Mumbai|Delhi|NCR|Noida|Gurgaon|Gurugram|Pune|Hyderabad|Chennai|Kolkata|Lucknow|Remote/i
-                                .test(text)
-                        ) {
-                            location = text;
-                        }
-                    }
-                );
-
-            if (!location) {
-                return;
-            }
-
-            /*
-             * Get all jb_title elements in THIS card.
-             *
-             * Example:
-             *
-             * [0] Gen AI Automation
-             * [1] Apeksha
-             *
-             * [0] = JOB TITLE
-             * [1] = COMPANY
-             */
-            const cardTitles = [];
-
-            cardLink
-                .find('td.jb_title')
-                .each(
-                    (i, element) => {
-
-                        const text =
-                            cleanText(
-                                $(element)
-                                    .clone()
-                                    .children()
-                                    .remove()
-                                    .end()
-                                    .text()
-                            );
-
-                        if (text) {
-                            cardTitles.push(text);
-                        }
-                    }
-                );
-
-            /*
-             * VERY IMPORTANT:
-             *
-             * We only create a job from the FIRST
-             * jb_title.
-             *
-             * Therefore:
-             *
-             * Gen AI Automation -> JOB
-             * Apeksha           -> COMPANY
-             *
-             * and NOT:
-             *
-             * Apeksha -> another JOB
-             */
-
-            if (
-                cardTitles.length === 0 ||
-                cardTitles[0] !== title
-            ) {
-                return;
-            }
-
-            /*
-             * Company is the second jb_title.
-             */
-            const company =
-                cardTitles.length > 1
-                    ? cardTitles[1]
-                    : '';
-
-            /*
-             * Build job object.
-             */
-            const job = {
-
-                title: title,
-
-                company: company,
-
-                recruiter: company,
-
-                location: location,
-
-                experience:
-                    experienceMatch[0],
-
-                salary: '',
-
-                url:
-                    isValidJobUrl(href)
-                        ? href
-                        : '',
-
-                matchScore: 0,
-
-                emailSubject:
-                    emailSubject,
-
-                emailDate:
-                    emailDate,
-
-                source:
-                    'Naukri Gmail Alert'
-            };
-
-            /*
-             * Calculate profile match.
-             */
-            job.matchScore =
-                calculateMatchScore(job);
-
-            /*
-             * Prevent duplicate jobs.
-             */
-            const alreadyExists =
-                jobs.some(
-                    existing =>
-                        existing.title
-                            .toLowerCase() ===
-                        job.title
-                            .toLowerCase()
-                        &&
-                        existing.company
-                            .toLowerCase() ===
-                        job.company
-                            .toLowerCase()
-                );
-
-            if (!alreadyExists) {
-                jobs.push(job);
-            }
+        if (
+            !href.includes("naukri.com/jd/job-listings")
+        ) {
+            return;
         }
-    );
+
+        const url = cleanNaukriUrl(
+            href
+        );
+
+        const jobId =
+            extractJobId(url);
+
+        if (!jobId) return;
+
+        const anchorText =
+            normalizeText(
+                $(element).text()
+            );
+
+        const parentText =
+            normalizeText(
+                $(element)
+                    .parent()
+                    .text()
+            );
+
+        const grandParentText =
+            normalizeText(
+                $(element)
+                    .parent()
+                    .parent()
+                    .text()
+            );
+
+        const rawText =
+            normalizeText(
+                `${anchorText} ${parentText} ${grandParentText}`
+            );
+
+        // ----------------------------------------------------
+        // Title
+        // ----------------------------------------------------
+
+        let title =
+            extractTitleFromUrl(url);
+
+        if (!title) {
+            title =
+                cleanJobTitle(
+                    anchorText
+                );
+        }
+
+        // ----------------------------------------------------
+        // Experience
+        // ----------------------------------------------------
+
+        let experience =
+            parseExperience(rawText);
+
+        if (!experience) {
+            experience =
+                extractExperienceFromUrl(
+                    url
+                );
+        }
+
+        // ----------------------------------------------------
+        // Location
+        // ----------------------------------------------------
+
+        const location =
+            extractLocation(
+                rawText,
+                url
+            );
+
+        // ----------------------------------------------------
+        // Company
+        // ----------------------------------------------------
+
+        let company =
+            extractCompanyFromUrl(
+                url
+            );
+
+        if (!company) {
+            company =
+                extractCompanyFromText(
+                    rawText,
+                    title
+                );
+        }
+
+        jobs.push({
+            jobId,
+            title:
+                title ||
+                "Unknown Job",
+            company:
+                company ||
+                "Company Not Detected",
+            location,
+            experience,
+            url,
+            rawText
+        });
+    });
 
     return jobs;
 }
 
-// =====================================================
-// MATCH SCORE
-// =====================================================
+function extractCompanyFromText(
+    text = "",
+    title = ""
+) {
+    const normalized =
+        normalizeText(text);
 
-function calculateMatchScore(job) {
-
-    let score = 0;
-
-    const text = `
-        ${job.title}
-        ${job.company}
-        ${job.location}
-        ${job.experience}
-    `.toLowerCase();
-
-    /*
-     * Angular
-     */
-    if (
-        text.includes('angular')
-    ) {
-        score += 40;
+    if (!normalized) {
+        return "";
     }
 
-    /*
-     * Frontend
-     */
-    if (
-        text.includes('frontend') ||
-        text.includes('front-end') ||
-        text.includes('front end')
-    ) {
-        score += 25;
+    if (!title) {
+        return "";
     }
 
-    /*
-     * TypeScript
-     */
-    if (
-        text.includes('typescript')
-    ) {
-        score += 15;
+    const titleIndex =
+        lower(normalized).indexOf(
+            lower(title)
+        );
+
+    if (titleIndex === -1) {
+        return "";
     }
 
-    /*
-     * JavaScript
-     */
-    if (
-        text.includes('javascript')
-    ) {
-        score += 10;
+    let remainder =
+        normalized.substring(
+            titleIndex + title.length
+        );
+
+    remainder =
+        remainder
+            .replace(
+                /^\s*[-|,:]\s*/,
+                ""
+            );
+
+    const experience =
+        remainder.match(
+            /\d+(?:\.\d+)?\s*(?:-|to)\s*\d+(?:\.\d+)?\s*(?:years?|yrs?)/i
+        );
+
+    if (experience) {
+        remainder =
+            remainder.substring(
+                0,
+                experience.index
+            );
     }
 
-    /*
-     * Node.js
-     */
+    remainder =
+        remainder
+            .split("|")[0]
+            .split("·")[0]
+            .trim();
+
     if (
-        text.includes('node.js') ||
-        text.includes('nodejs') ||
-        text.includes('node js')
+        remainder.length > 2 &&
+        remainder.length < 100
     ) {
-        score += 10;
+        return remainder;
     }
 
-    /*
-     * Preferred locations.
-     */
-    if (
-        /lucknow|noida|gurgaon|gurugram|bangalore|bengaluru|pune/i
-            .test(job.location)
-    ) {
-        score += 10;
-    }
-
-    return Math.min(
-        score,
-        100
-    );
+    return "";
 }
 
-// =====================================================
-// GOOGLE AUTHENTICATION
-// =====================================================
+// ============================================================
+// EMAIL PARSING
+// ============================================================
 
-async function getGmailClient() {
-
-    console.log(
-        'Starting Google authentication...'
-    );
-
-    const auth =
-        await authenticate({
-
-            scopes: SCOPES,
-
-            keyfilePath:
-                CREDENTIALS_PATH
-
+async function getNaukriEmails(auth) {
+    const gmail =
+        google.gmail({
+            version: "v1",
+            auth
         });
 
     console.log(
-        'Google authentication successful.'
-    );
-
-    return google.gmail({
-
-        version: 'v1',
-
-        auth
-
-    });
-}
-
-// =====================================================
-// MAIN
-// =====================================================
-
-async function getNaukriEmails() {
-
-    const gmail =
-        await getGmailClient();
-
-    console.log('');
-    console.log(
-        'Testing Gmail API connection...'
+        "\nTesting Gmail API connection..."
     );
 
     const profile =
         await gmail.users.getProfile({
-
-            userId: 'me'
-
+            userId: "me"
         });
 
     console.log(
         `Gmail account: ${profile.data.emailAddress}`
     );
 
-    console.log('');
     console.log(
-        'Searching Gmail for Naukri job alerts...'
+        "\nSearching Gmail for Naukri job alerts..."
     );
 
     const response =
         await gmail.users.messages.list({
-
-            userId: 'me',
-
+            userId: "me",
             q:
-                'from:(naukri) newer_than:1d',
-
+                "from:(naukri) newer_than:1d",
             maxResults: 20
-
         });
 
     const messages =
@@ -574,271 +1167,970 @@ async function getNaukriEmails() {
         `Found ${messages.length} Naukri email(s).`
     );
 
-    /*
-     * Create email dump directory.
-     */
-    if (
-        !fs.existsSync(
-            OUTPUT_DIR
-        )
-    ) {
+    return {
+        gmail,
+        messages
+    };
+}
 
-        fs.mkdirSync(
-            OUTPUT_DIR,
-            {
-                recursive: true
-            }
-        );
-    }
+async function processEmail(
+    gmail,
+    messageId,
+    index
+) {
+    const response =
+        await gmail.users.messages.get({
+            userId: "me",
+            id: messageId,
+            format: "full"
+        });
 
-    const allJobs = [];
+    const message =
+        response.data;
 
-    let emailNumber = 1;
+    const headers =
+        message.payload?.headers || [];
 
-    for (
-        const message
-        of messages
-    ) {
-
-        console.log('');
-        console.log(
-            `Processing email ${emailNumber}/${messages.length}...`
-        );
-
-        const email =
-            await gmail.users.messages.get({
-
-                userId: 'me',
-
-                id: message.id,
-
-                format: 'full'
-
-            });
-
-        const payload =
-            email.data.payload;
-
-        const headers =
-            payload.headers || [];
-
-        const subject =
-            getHeader(
-                headers,
-                'Subject'
-            );
-
-        const date =
-            getHeader(
-                headers,
-                'Date'
-            );
-
-        console.log(
-            `Subject: ${subject}`
+    const subject =
+        getHeader(
+            headers,
+            "Subject"
         );
 
-        const html =
-            extractHtml(
-                payload
-            );
-
-        if (!html) {
-
-            console.log(
-                'No HTML content found.'
-            );
-
-            emailNumber++;
-
-            continue;
-        }
-
-        /*
-         * Save HTML for debugging.
-         */
-        const htmlPath =
-            path.join(
-                OUTPUT_DIR,
-                `email-${emailNumber}.html`
-            );
-
-        fs.writeFileSync(
-            htmlPath,
-            html,
-            'utf8'
+    const from =
+        getHeader(
+            headers,
+            "From"
         );
 
-        console.log(
-            `HTML saved: ${htmlPath}`
+    const date =
+        getHeader(
+            headers,
+            "Date"
         );
 
-        /*
-         * Extract jobs.
-         */
-        const jobs =
-            extractJobsFromHtml(
-                html,
-                subject,
-                date
-            );
+    console.log(
+        `\nProcessing email ${index}...`
+    );
 
-        console.log(
-            `Jobs extracted from this email: ${jobs.length}`
+    console.log(
+        `Subject: ${subject}`
+    );
+
+    console.log(
+        `From: ${from}`
+    );
+
+    const body =
+        extractBody(
+            message.payload
         );
 
-        allJobs.push(
-            ...jobs
+    const html =
+        body.html || "";
+
+    const text =
+        body.text || "";
+
+    const htmlPath =
+        path.join(
+            EMAIL_DUMP_DIR,
+            `email-${index}.html`
         );
 
-        emailNumber++;
-    }
+    const textPath =
+        path.join(
+            EMAIL_DUMP_DIR,
+            `email-${index}.txt`
+        );
 
-    /*
-     * Remove duplicates across emails.
-     */
-    const uniqueJobs = [];
+    fs.writeFileSync(
+        htmlPath,
+        html,
+        "utf8"
+    );
 
-    for (
-        const job
-        of allJobs
-    ) {
+    fs.writeFileSync(
+        textPath,
+        text,
+        "utf8"
+    );
 
-        const duplicate =
-            uniqueJobs.some(
-                existing =>
-                    existing.title
-                        .toLowerCase() ===
-                    job.title
-                        .toLowerCase()
-                    &&
-                    existing.company
-                        .toLowerCase() ===
-                    job.company
-                        .toLowerCase()
-            );
+    console.log(
+        `HTML saved: ${htmlPath}`
+    );
 
-        if (!duplicate) {
+    const jobs =
+        extractJobCards(html);
 
-            uniqueJobs.push(
+    console.log(
+        `Jobs extracted from this email: ${jobs.length}`
+    );
+
+    return {
+        subject,
+        from,
+        date,
+        jobs
+    };
+}
+
+// ============================================================
+// DEDUPLICATION
+// ============================================================
+
+function deduplicateJobs(jobs) {
+    const map =
+        new Map();
+
+    for (const job of jobs) {
+        if (!job.jobId) continue;
+
+        if (!map.has(job.jobId)) {
+            map.set(
+                job.jobId,
                 job
             );
         }
     }
 
-    /*
-     * Sort by match score.
-     */
-    uniqueJobs.sort(
-        (a, b) =>
-            b.matchScore -
-            a.matchScore
-    );
+    return [...map.values()];
+}
 
-    /*
-     * Save JSON.
-     */
-    fs.writeFileSync(
+// ============================================================
+// REPORT GENERATION
+// ============================================================
 
-        JOBS_FILE,
+function scoreBadge(category) {
+    if (category === "EXCELLENT") {
+        return "🔥";
+    }
 
-        JSON.stringify(
-            uniqueJobs,
-            null,
-            2
-        ),
+    if (category === "GOOD") {
+        return "⭐";
+    }
 
-        'utf8'
-    );
+    if (category === "POSSIBLE") {
+        return "👀";
+    }
 
-    // =================================================
-    // OUTPUT
-    // =================================================
+    return "⏭️";
+}
 
-    console.log('');
+function buildJobCard(job) {
+    const badge =
+        scoreBadge(
+            job.category
+        );
+
+    const experience =
+        job.experience?.text ||
+        "Not detected";
+
+    const skills =
+        [
+            ...job.match.skills.primary,
+            ...job.match.skills.secondary
+        ];
+
+    const uniqueSkills =
+        [...new Set(skills)];
+
+    const skillHtml =
+        uniqueSkills.length
+            ? uniqueSkills
+                .slice(0, 8)
+                .map(
+                    skill =>
+                        `<span class="skill">${escapeHtml(skill)}</span>`
+                )
+                .join("")
+            : `<span class="muted">No additional skills detected</span>`;
+
+    const reasonsHtml =
+        job.match.reasons
+            .map(
+                reason =>
+                    `<li>${escapeHtml(reason)}</li>`
+            )
+            .join("");
+
+    return `
+        <div class="job-card">
+
+            <div class="job-header">
+
+                <div>
+                    <div class="category">
+                        ${badge} ${escapeHtml(job.category)}
+                    </div>
+
+                    <h2>
+                        ${escapeHtml(job.title)}
+                    </h2>
+
+                    <div class="company">
+                        ${escapeHtml(job.company)}
+                    </div>
+                </div>
+
+                <div class="score">
+                    ${job.match.score}
+                    <span>/100</span>
+                </div>
+
+            </div>
+
+            <div class="metadata">
+
+                <div>
+                    📍
+                    <strong>Location</strong><br>
+                    ${escapeHtml(job.location)}
+                </div>
+
+                <div>
+                    💼
+                    <strong>Experience</strong><br>
+                    ${escapeHtml(experience)}
+                </div>
+
+                <div>
+                    🆔
+                    <strong>Job ID</strong><br>
+                    ${escapeHtml(job.jobId)}
+                </div>
+
+            </div>
+
+            <div class="section-title">
+                Why this matches you
+            </div>
+
+            <ul class="reasons">
+                ${reasonsHtml}
+            </ul>
+
+            <div class="section-title">
+                Relevant skills detected
+            </div>
+
+            <div class="skills">
+                ${skillHtml}
+            </div>
+
+            <div class="actions">
+
+                <a
+                    class="apply-button"
+                    href="${escapeHtml(job.url)}"
+                    target="_blank"
+                >
+                    Apply Now →
+                </a>
+
+            </div>
+
+        </div>
+    `;
+}
+
+function buildEmailHtml(jobs) {
+    const excellent =
+        jobs.filter(
+            j => j.category === "EXCELLENT"
+        ).length;
+
+    const good =
+        jobs.filter(
+            j => j.category === "GOOD"
+        ).length;
+
+    const possible =
+        jobs.filter(
+            j => j.category === "POSSIBLE"
+        ).length;
+
+    const today =
+        new Date().toLocaleDateString(
+            "en-IN",
+            {
+                day: "numeric",
+                month: "short",
+                year: "numeric"
+            }
+        );
+
+    const cards =
+        jobs
+            .filter(
+                job =>
+                    job.category !== "SKIP"
+            )
+            .sort(
+                (a, b) =>
+                    b.match.score -
+                    a.match.score
+            )
+            .map(
+                buildJobCard
+            )
+            .join("");
+
+    return `
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+Naukri Job Match Report
+</title>
+
+<style>
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #f4f6f8;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+    color: #1f2937;
+}
+
+.container {
+    max-width: 760px;
+    margin: 30px auto;
+    padding: 0 16px;
+}
+
+.header {
+    background: #111827;
+    color: white;
+    padding: 28px;
+    border-radius: 16px 16px 0 0;
+}
+
+.header h1 {
+    margin: 0 0 8px;
+    font-size: 25px;
+}
+
+.header p {
+    margin: 0;
+    color: #d1d5db;
+}
+
+.summary {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: white;
+    padding: 18px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.summary-item {
+    flex: 1;
+    min-width: 120px;
+    padding: 14px;
+    border-radius: 10px;
+    background: #f9fafb;
+    text-align: center;
+}
+
+.summary-number {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.summary-label {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.job-card {
+    background: white;
+    margin-top: 16px;
+    padding: 22px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+}
+
+.job-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.category {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 7px;
+}
+
+.job-card h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.company {
+    margin-top: 6px;
+    color: #4b5563;
+    font-weight: 600;
+}
+
+.score {
+    font-size: 27px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.score span {
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+.metadata {
+    display: grid;
+    grid-template-columns:
+        repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.metadata > div {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 9px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.section-title {
+    margin-top: 20px;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.reasons {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.reasons li {
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.skill {
+    background: #eef2ff;
+    color: #3730a3;
+    padding: 5px 9px;
+    border-radius: 20px;
+    font-size: 12px;
+}
+
+.muted {
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+.actions {
+    margin-top: 22px;
+}
+
+.apply-button {
+    display: inline-block;
+    padding: 11px 18px;
+    background: #111827;
+    color: white !important;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.footer {
+    text-align: center;
+    padding: 25px;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+@media(max-width:600px) {
+
+    .metadata {
+        grid-template-columns: 1fr;
+    }
+
+    .job-header {
+        flex-direction: column;
+    }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+
+        <h1>
+            🎯 Your Naukri Job Match Report
+        </h1>
+
+        <p>
+            Curated for ${escapeHtml(PROFILE.name)}
+            · ${today}
+        </p>
+
+    </div>
+
+    <div class="summary">
+
+        <div class="summary-item">
+            <div class="summary-number">
+                ${excellent}
+            </div>
+            <div class="summary-label">
+                🔥 Excellent
+            </div>
+        </div>
+
+        <div class="summary-item">
+            <div class="summary-number">
+                ${good}
+            </div>
+            <div class="summary-label">
+                ⭐ Good
+            </div>
+        </div>
+
+        <div class="summary-item">
+            <div class="summary-number">
+                ${possible}
+            </div>
+            <div class="summary-label">
+                👀 Possible
+            </div>
+        </div>
+
+        <div class="summary-item">
+            <div class="summary-number">
+                ${jobs.length}
+            </div>
+            <div class="summary-label">
+                Total Matches
+            </div>
+        </div>
+
+    </div>
+
+    ${cards || `
+        <div class="job-card">
+            <h2>
+                No meaningful jobs found
+            </h2>
+            <p>
+                No jobs crossed the current matching threshold.
+            </p>
+        </div>
+    `}
+
+    <div class="footer">
+
+        Generated automatically from Naukri job alerts.
+
+        <br><br>
+
+        Angular & Frontend focused matching
+        based on your current profile.
+
+    </div>
+
+</div>
+
+</body>
+
+</html>
+`;
+}
+
+// ============================================================
+// SEND EMAIL
+// ============================================================
+
+function encodeBase64Url(value) {
+    return Buffer
+        .from(value)
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+}
+
+async function sendEmailReport(
+    gmail,
+    jobs
+) {
+    if (!jobs.length) {
+        console.log(
+            "No meaningful jobs found."
+        );
+
+        console.log(
+            "No email report will be sent."
+        );
+
+        return;
+    }
+
+    const html =
+        buildEmailHtml(
+            jobs
+        );
+
+    const excellent =
+        jobs.filter(
+            j => j.category === "EXCELLENT"
+        ).length;
+
+    const good =
+        jobs.filter(
+            j => j.category === "GOOD"
+        ).length;
+
+    const possible =
+        jobs.filter(
+            j => j.category === "POSSIBLE"
+        ).length;
+
+const subject =
+    `Naukri Job Matches: ${excellent} Excellent, ${good} Good, ${possible} Possible`;
+
+    const message = [
+        `From: Animesh Pandey`,
+        `To: animeshpandeyit@gmail.com`,
+        `Subject: ${subject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: text/html; charset=UTF-8`,
+        "",
+        html
+    ].join("\r\n");
+
+    const encoded =
+        encodeBase64Url(
+            message
+        );
+
+    await gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+            raw: encoded
+        }
+    });
+
     console.log(
-        '========================================'
+        "\nEmail report sent to animeshpandeyit@gmail.com"
+    );
+}
+
+// ============================================================
+// MAIN
+// ============================================================
+
+async function main() {
+    ensureDirectories();
+
+    const auth =
+        await authorize();
+
+    const {
+        gmail,
+        messages
+    } = await getNaukriEmails(
+        auth
+    );
+
+    const allJobs = [];
+
+    for (
+        let i = 0;
+        i < messages.length;
+        i++
+    ) {
+        const result =
+            await processEmail(
+                gmail,
+                messages[i].id,
+                i + 1
+            );
+
+        allJobs.push(
+            ...result.jobs
+        );
+    }
+
+    const uniqueJobs =
+        deduplicateJobs(
+            allJobs
+        );
+
+    console.log(
+        `\n========================================`
     );
 
     console.log(
         `TOTAL UNIQUE JOBS: ${uniqueJobs.length}`
     );
 
-    console.log(
-        '========================================'
-    );
+    // --------------------------------------------------------
+    // Match every job
+    // --------------------------------------------------------
 
-    uniqueJobs.forEach(
-        (job, index) => {
+    const processedJobs =
+        uniqueJobs.map(job => {
 
-            console.log('');
+            const match =
+                calculateMatch(
+                    job
+                );
 
-            console.log(
-                `${index + 1}. ${job.title}`
+            return {
+                ...job,
+                match,
+                score: match.score,
+                category: match.category
+            };
+        });
+
+    const meaningfulJobs =
+        processedJobs
+            .filter(
+                job =>
+                    job.category !== "SKIP"
+            )
+            .sort(
+                (a, b) =>
+                    b.score -
+                    a.score
             );
-
-            console.log(
-                `   Company: ${job.company || 'Not detected'}`
-            );
-
-            console.log(
-                `   Location: ${job.location || 'Not detected'}`
-            );
-
-            console.log(
-                `   Experience: ${job.experience || 'Not detected'}`
-            );
-
-            console.log(
-                `   Match Score: ${job.matchScore}/100`
-            );
-
-            console.log(
-                `   URL: ${job.url || 'Not detected'}`
-            );
-        }
-    );
-
-    console.log('');
-    console.log(
-        '========================================'
-    );
 
     console.log(
-        'GMAIL JOB FINDER SUCCESSFUL'
+        `MEANINGFUL JOBS: ${meaningfulJobs.length}`
+    );
+
+    // --------------------------------------------------------
+    // Print jobs
+    // --------------------------------------------------------
+
+    for (
+        let i = 0;
+        i < meaningfulJobs.length;
+        i++
+    ) {
+        const job =
+            meaningfulJobs[i];
+
+        console.log(
+            `\n${i + 1}. ${job.title}`
+        );
+
+        console.log(
+            `   Company: ${job.company}`
+        );
+
+        console.log(
+            `   Location: ${job.location}`
+        );
+
+        console.log(
+            `   Experience: ${job.experience?.text ||
+            "Not detected"
+            }`
+        );
+
+        console.log(
+            `   Match Score: ${job.score}/100`
+        );
+
+        console.log(
+            `   Category: ${job.category}`
+        );
+
+        console.log(
+            `   Why: ${job.match.reasons.join(
+                " | "
+            )}`
+        );
+
+        console.log(
+            `   Job ID: ${job.jobId}`
+        );
+
+        console.log(
+            `   URL: ${job.url}`
+        );
+    }
+
+    // --------------------------------------------------------
+    // Summary
+    // --------------------------------------------------------
+
+    const excellent =
+        processedJobs.filter(
+            j => j.category === "EXCELLENT"
+        ).length;
+
+    const good =
+        processedJobs.filter(
+            j => j.category === "GOOD"
+        ).length;
+
+    const possible =
+        processedJobs.filter(
+            j => j.category === "POSSIBLE"
+        ).length;
+
+    const skip =
+        processedJobs.filter(
+            j => j.category === "SKIP"
+        ).length;
+
+    console.log(
+        `\n========================================`
     );
 
     console.log(
-        `Jobs saved to: ${JOBS_FILE}`
+        `JOB MATCH SUMMARY`
     );
 
     console.log(
-        '========================================'
+        `========================================`
+    );
+
+    console.log(
+        `EXCELLENT : ${excellent}`
+    );
+
+    console.log(
+        `GOOD      : ${good}`
+    );
+
+    console.log(
+        `POSSIBLE  : ${possible}`
+    );
+
+    console.log(
+        `SKIP      : ${skip}`
+    );
+
+    console.log(
+        `========================================`
+    );
+
+    // --------------------------------------------------------
+    // Save all jobs
+    // --------------------------------------------------------
+
+    fs.writeFileSync(
+        JOBS_PATH,
+        JSON.stringify(
+            processedJobs,
+            null,
+            2
+        ),
+        "utf8"
+    );
+
+    fs.writeFileSync(
+        MATCHED_JOBS_PATH,
+        JSON.stringify(
+            meaningfulJobs,
+            null,
+            2
+        ),
+        "utf8"
+    );
+
+    // --------------------------------------------------------
+    // Email
+    // --------------------------------------------------------
+
+    await sendEmailReport(
+        gmail,
+        meaningfulJobs
+    );
+
+    console.log(
+        `\n========================================`
+    );
+
+    console.log(
+        `GMAIL JOB FINDER SUCCESSFUL`
+    );
+
+    console.log(
+        `========================================`
+    );
+
+    console.log(
+        `All jobs saved to: ${JOBS_PATH}`
+    );
+
+    console.log(
+        `Relevant jobs saved to: ${MATCHED_JOBS_PATH}`
+    );
+
+    if (meaningfulJobs.length) {
+        console.log(
+            `Email report sent to: animeshpandeyit@gmail.com`
+        );
+    }
+
+    console.log(
+        `========================================`
     );
 }
 
-// =====================================================
-// START
-// =====================================================
+// ============================================================
+// RUN
+// ============================================================
 
-getNaukriEmails()
-    .catch(error => {
+main().catch(error => {
 
-        console.error('');
-        console.error(
-            '========================================'
-        );
+    console.error(
+        "\n========================================"
+    );
 
-        console.error(
-            'GMAIL AUTOMATION FAILED'
-        );
+    console.error(
+        "GMAIL JOB FINDER FAILED"
+    );
 
-        console.error(
-            '========================================'
-        );
+    console.error(
+        "========================================"
+    );
 
-        console.error(
-            error
-        );
+    console.error(
+        error
+    );
 
-    });
+    process.exit(1);
+});
