@@ -41,7 +41,15 @@ module.exports = {
         "Bangalore",
         "Noida",
         "Lucknow",
-        "Pune"
+        "Pune",
+        "Hyderabad",
+        "Chennai",
+        "Gurgaon",
+        "Gurugram",
+        "Delhi",
+        "Mumbai",
+        "Kolkata",
+        "Remote"
     ],
 
     preferredRoles: [
